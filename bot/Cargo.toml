@@ -19,4 +19,5 @@ tracing-subscriber = { version = "0.3", default-features = false, features = ["e
 csv = "1.1"
 serde = { version = "1", features = ["derive"] }
 mev-share = "0.1.1"
+clap = { version = "4.2.5", features = ["derive"] }
 

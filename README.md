@@ -1,10 +1,16 @@
-# Artemis MEV-Share template
+# Artemis MEV-Share Uniswap/Sushiswap Arbitrage
 
-**Template for quickly getting started with developing Mev Share Strategies in Artemis**
+This project implements a simple probabilistic UniswapV2/Sushiswap arbitrage on MEV-Share, using the Artemis MEV-Share template found [here](https://github.com/FrankieIsLost/artemis-mev-share-template).
 
-Continuous Integration is already set up to test both your Rust and Solidity
-code, as well as ensure formatting and that your Rust bindings match the
-Solidity build artifacts.
+## Strategy
+
+### Sync
+
+We first load all WETH pools that exist on both Uniswap V2 and Sushiswap for which WETH is `token1` in the pair. The list of these pools was found [here](https://github.com/paradigmxyz/artemis/blob/main/crates/strategies/mev-share-uni-arb/resources/uni_sushi_weth_pools.csv).
+
+### Processing
+
+After loading in the pools, we listen to MEV-Share events for transactions that are made to any of the pools (Uniswap and Sushiswap) loaded in. After detecting such a transaction, we find its corresponding pair (either the Uniswap V2 pair of the Sushiswap pair) and submit backruns of various size.
 
 ## Directory Structure
 

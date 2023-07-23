@@ -7,19 +7,38 @@ use artemis_core::{
     types::{CollectorMap, ExecutorMap},
 };
 use ethers::{
-    prelude::{rand, MiddlewareBuilder},
+    prelude::MiddlewareBuilder,
     providers::{Provider, Ws},
     signers::{LocalWallet, Signer},
     types::{Address, Chain},
 };
 
-use uni_sushi::{Action, Event, MevShareUniSushiArb};
+use clap::Parser;
+
 use tracing::{info, Level};
 use tracing_subscriber::{filter, prelude::*};
+use uni_sushi::{Action, Event, MevShareUniSushiArb};
 
 mod uni_sushi;
 
 use eyre::Result;
+
+/// CLI Options.
+#[derive(Parser, Debug)]
+pub struct Args {
+    /// Ethereum node WS endpoint.
+    #[arg(long)]
+    pub wss: String,
+    /// Private key for sending txs.
+    #[arg(long)]
+    pub private_key: String,
+    /// MEV share signer
+    #[arg(long)]
+    pub flashbots_signer: String,
+    /// Address of the arb contract.
+    #[arg(long)]
+    pub arb_contract_address: Address,
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -30,30 +49,30 @@ async fn main() -> Result<()> {
     // Set up engine.
     let mut engine: Engine<Event, Action> = Engine::default();
 
+    let args = Args::parse();
+
     // Set up collector.
     let mevshare_collector =
         Box::new(MevShareCollector::new(String::from("https://mev-share.flashbots.net")));
     let mevshare_collector = CollectorMap::new(mevshare_collector, Event::MEVShareEvent);
     engine.add_collector(Box::new(mevshare_collector));
 
-    // Set up strategy.
-
-    let ws = Ws::connect("wss://mainnet.infura.io/ws/v3/c60b0bb42f8a4c6481ecd229eddaca27").await?;
+    //  Set up providers and signers.
+    let ws = Ws::connect(args.wss).await?;
     let provider = Provider::new(ws);
 
-    // These should be replaced with actual values
-    let wallet: LocalWallet = ethers::signers::LocalWallet::new(&mut rand::thread_rng());
+    let wallet: LocalWallet = args.private_key.parse().unwrap();
     let address = wallet.address();
-    let contract_address = Address::random();
+    let contract_address = args.arb_contract_address;
+
+    let provider = Arc::new(provider.nonce_manager(address).with_signer(wallet.clone()));
+    let fb_signer: LocalWallet = args.flashbots_signer.parse().unwrap();
 
     let provider = Arc::new(provider.nonce_manager(address).with_signer(wallet.clone()));
     let strategy = MevShareUniSushiArb::new(Arc::new(provider.clone()), wallet, contract_address);
     engine.add_strategy(Box::new(strategy));
 
     // Set up executor.
-
-    // this should be the key you want to use to sign flashbots bundle
-    let fb_signer = ethers::signers::LocalWallet::new(&mut rand::thread_rng());
 
     let mev_share_executor = Box::new(MevshareExecutor::new(fb_signer, Chain::Mainnet));
     let mev_share_executor = ExecutorMap::new(mev_share_executor, |action| match action {
